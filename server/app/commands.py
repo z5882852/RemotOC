@@ -3,7 +3,6 @@ from utils import *
 from fastapi import APIRouter, Depends, HTTPException, Header
 from models import *
 import uuid
-import json
 from typing import Optional
 
 
