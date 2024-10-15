@@ -105,7 +105,7 @@ function executor.processCommands(command_table)
         if success then
             command_result_table[cid] = json.encode(command_result)
         else
-            command_result_table[cid] = command_result
+            command_result_table[cid] = json.encode({ message = command_result })
         end
     end
     return command_result_table
@@ -154,7 +154,7 @@ function executor.fetchCommands()
     -- 将 JSON 响应解码为 Lua 表
     local res = json.decode(response)
 
-    
+
     -- 检查响应码
     if not res or res.code ~= 200 then
         if res.message then

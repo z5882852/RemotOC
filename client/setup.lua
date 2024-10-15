@@ -1,5 +1,5 @@
 local shell = require('shell')
-local repo = "https://github.com/z5882852/RemotOC/blob/main/"
+local repo = "https://github.com/z5882852/RemoteOC/blob/main/client/"
 local scripts = {
     'run.lua',
     'env.lua',
