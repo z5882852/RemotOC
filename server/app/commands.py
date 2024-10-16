@@ -40,7 +40,7 @@ async def get_commands(x_client_id: Optional[str] = Header(None, description="�
         return {"code": 200, "message": "No ready commands available", "data": None}
 
 
-@router.post("/report", response_model=StandardResponseModel, dependencies=[Depends(token_required)],)
+@router.post("/report", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
 async def receive_report(command_result: CommandResultModel):
     """
     接收客户端的任务执行后的结果
@@ -51,9 +51,11 @@ async def receive_report(command_result: CommandResultModel):
     if not task_manager.task_exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if task_id in timer_task_config:
-        callback = timer_task_config.get(task_id).get("callback")
-        callback(results)
+    for config in [timer_task_config, task_config]:
+        if task_id in config:
+            callback = config.get(task_id, {}).get("callback", None)
+            if callback:
+                callback(results)
 
     task_manager.update_task(task_id, status=COMPLETED, results=results)
     return {"code": 200, "message": f"Task {task_id} result received", "data": {"taskId": task_id}}

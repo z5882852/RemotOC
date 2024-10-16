@@ -184,7 +184,7 @@ function executor.reportResults(taskId, command_result_table)
     logger.debug("Reporting command results to server for Task ID: " .. tostring(taskId))
 
     local report_data = {
-        taskId = taskId,
+        task_id = taskId,
         results = command_result_table
     }
 

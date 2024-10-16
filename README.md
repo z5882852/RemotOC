@@ -64,9 +64,9 @@ RemoteOC
 │   ├── plugins  # 插件目录
 │   │   └── echo.lua
 │   ├── run.lua  # 启动文件
-│   ├── setup.lua
+│   ├── setup.lua  # 安装程序
 │   └── src
-│       └── executor.lua
+│       └── executor.lua  # 执行和上报程序
 └── server
     ├── app
     │   ├── commands.py
@@ -75,7 +75,7 @@ RemoteOC
     ├── config.py  # 任务配置文件
     ├── .env  # 服务端配置文件
     ├── models.py
-    ├── requirements.txt
+    ├── requirements.txt  # 依赖文件
     ├── run.py
     ├── scheduler.py
     └── utils.py
