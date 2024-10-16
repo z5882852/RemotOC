@@ -2,10 +2,9 @@ import logging
 import os
 import json
 from dotenv import load_dotenv
-
+from datetime import datetime
 
 load_dotenv()
-
 
 levels = {
     "DEBUG": logging.DEBUG,
@@ -22,12 +21,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("uvicorn.error")
 
-
 # 任务状态常量
 READY = 'ready'
 PENDING = 'pending'
 COMPLETED = 'completed'
-
 
 class TaskManager:
     def __init__(self, file_dir="tasks"):
@@ -38,7 +35,6 @@ class TaskManager:
         self.file_dir = file_dir
         if not os.path.exists(self.file_dir):
             os.makedirs(self.file_dir)
-
 
     def add_task(self, task_id: str, client_id: str, commands: list, status=READY) -> None:
         """
@@ -51,26 +47,15 @@ class TaskManager:
         task_data = {
             'client_id': client_id,
             'commands': commands,
-            'status': status
+            'status': status,
+            'created_time': datetime.now().isoformat(),  # 任务创建时间
+            'pending_time': None,  # Pending状态的时间
+            'completed_time': None  # 任务结束时间
         }
         file_path = os.path.join(self.file_dir, f"{task_id}.json")
         with open(file_path, "w") as file:
             json.dump(task_data, file)
         logger.debug('Add task: %s %s %s %s', task_id, client_id, commands, status)
-        
-        
-
-    def add_task_data(self, task_id, task_data: dict) -> None:
-        """
-        添加任务数据
-        :param task_id: 任务ID
-        :param task_data: 任务数据（字典形式）
-        """
-        file_path = os.path.join(self.file_dir, f"{task_id}.json")
-        with open(file_path, "w") as file:
-            json.dump(task_data, file)
-        logger.debug('Add task: %s %s', task_id, task_data)
-
 
     def update_task(self, task_id, status=None, results=None):
         """
@@ -86,6 +71,10 @@ class TaskManager:
 
         if status:
             task['status'] = status
+            if status == PENDING and not task.get('pending_time'):
+                task['pending_time'] = datetime.now().isoformat()  # 记录Pending状态的时间
+            elif status == COMPLETED:
+                task['completed_time'] = datetime.now().isoformat()  # 记录任务结束的时间
         if results:
             task['results'] = results
 
@@ -94,7 +83,6 @@ class TaskManager:
         with open(file_path, "w") as file:
             json.dump(task, file)
         return True
-
 
     def get_task(self, task_id) -> dict | None:
         """
@@ -140,4 +128,3 @@ class TaskManager:
 
 
 task_manager = TaskManager()
-
