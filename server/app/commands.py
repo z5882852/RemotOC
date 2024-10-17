@@ -1,6 +1,6 @@
 from config import timer_task_config, task_config, SERVER_TOKEN
 from utils import *
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 from models import *
 import uuid
 from typing import Optional
@@ -41,10 +41,21 @@ async def get_commands(x_client_id: Optional[str] = Header(None, description="�
 
 
 @router.post("/report", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
-async def receive_report(command_result: CommandResultModel):
+async def receive_report(request: Request):
     """
     接收客户端的任务执行后的结果
     """
+    try:
+        body = await request.body()  # OC返回数据为GBK，直接使用pydantic解析会报400错误
+        decoded_body = decode_request_body(body)
+        json_data = json.loads(decoded_body)
+        command_result = CommandResultModel(**json_data)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON 解析失败: {str(e)}")
+        raise HTTPException(status_code=400, detail="JSON 格式错误")
+    except UnicodeDecodeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     task_id = command_result.task_id
     results = command_result.results
 
@@ -126,7 +137,9 @@ async def add_task_by_name(data: AddTaskByNameModel):
 
     # 将任务加入任务管理器
     if task_config_entry.get('cache', False):
-        task_manager.update_task(task_id, status=READY)
+        if not task_manager.update_task(task_id, status=READY):
+            # 没有任务则创建新任务
+            task_manager.add_task(task_id, client_id, commands, READY)
     else:
         task_manager.add_task(task_id, client_id, commands, READY)
 
