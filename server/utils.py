@@ -71,7 +71,9 @@ class TaskManager:
 
         if status:
             task['status'] = status
-            if status == PENDING and not task.get('pending_time'):
+            if status == READY:
+                task['created_time'] = datetime.now().isoformat()  # 记录创建状态的时间（使用缓存时）
+            elif status == PENDING:
                 task['pending_time'] = datetime.now().isoformat()  # 记录Pending状态的时间
             elif status == COMPLETED:
                 task['completed_time'] = datetime.now().isoformat()  # 记录任务结束的时间

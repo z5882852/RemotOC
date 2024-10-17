@@ -15,8 +15,9 @@ timer_task_config = {
         'commands': [  # 远程执行的命令列表
             "return 114514",
         ],
-        # 命令执行后的回调函数，callback(results: list)
-        'callback': test,
+        'cache': False,  # 是否缓存数据，即创建新任务时上次任务的数据不会清空
+        'handle': None,  # 命令执行后的处理函数，results = handle(results: list)，应有返回值，不需要则None
+        'callback': test,  # 命令执行后的回调函数，callback(results: list)，其中results是经过处理过的(handle)，不需要则None
     },
 }
 
@@ -28,9 +29,9 @@ task_config = {
         'commands': [  # 远程执行的命令列表
             "return echo(114514)",
         ],
-        # 命令执行后的回调函数，callback(results: list)，不需要则None
-        'callback': test,
-
+        'cache': False,  # 是否缓存数据，即创建新任务时上次任务的数据不会清空
+        'handle': None,  # 命令执行后的处理函数，results = handle(results: list)，应有返回值，不需要则None
+        'callback': test,  # 命令执行后的回调函数，callback(results: list)，其中results是经过处理过的(handle)，不需要则None
     },
 }
 

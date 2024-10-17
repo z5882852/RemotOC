@@ -53,7 +53,11 @@ async def receive_report(command_result: CommandResultModel):
 
     for config in [timer_task_config, task_config]:
         if task_id in config:
-            callback = config.get(task_id, {}).get("callback", None)
+            handle = config.get(task_id, {}).get("handle")
+            if handle:
+                results = handle(results)
+
+            callback = config.get(task_id, {}).get("callback")
             if callback:
                 callback(results)
 
@@ -121,6 +125,9 @@ async def add_task_by_name(data: AddTaskByNameModel):
         return {"code": 400, "message": f"No commands found for task name: {task_id}", "data": None}
 
     # 将任务加入任务管理器
-    task_manager.add_task(task_id, client_id, commands, READY)
+    if task_config_entry.get('cache', False):
+        task_manager.update_task(task_id, status=READY)
+    else:
+        task_manager.add_task(task_id, client_id, commands, READY)
 
     return {"code": 200, "message": f"Task '{task_id}' added with {len(commands)} command(s)", "data": {"taskId": task_id}}

@@ -9,12 +9,15 @@ def add_task_periodically(task_id, content):
     添加任务到队列并根据任务的间隔继续递归调用自己
     """
     # 将任务添加到队列中
-    task_manager.add_task(
-        task_id,
-        content.get('client_id', None),
-        content.get('commands', {}),
-        READY
-    )
+    if content.get('cache', False):
+        task_manager.update_task(task_id, status=READY)
+    else:
+        task_manager.add_task(
+            task_id,
+            content.get('client_id', None),
+            content.get('commands', {}),
+            READY
+        )
     
     # 创建一个新的定时器
     interval = content.get('interval', 30)
