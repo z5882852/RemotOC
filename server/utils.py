@@ -51,7 +51,7 @@ class TaskManager:
             'client_id': client_id,
             'commands': commands,
             'status': status,
-            'is_chunked': is_chunked,  # 标识是否为分块任务
+            'chunked': is_chunked,  # 标识是否为分块任务
             'created_time': datetime.now().isoformat(),  # 任务创建时间
             'pending_time': None,  # Pending状态的时间
             'completed_time': None  # 任务结束时间

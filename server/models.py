@@ -12,6 +12,11 @@ class CommandResultModel(BaseModel):
     task_id: str = Field(..., description="任务的唯一标识符")
     results: List[str] = Field(..., description="任务执行的结果，通常是输出的文本或数据")
 
+# 分块上报内容
+class CommandChunkedResultModel(BaseModel):
+    task_id: str = Field(..., description="任务的唯一标识符")
+    results: List = Field(..., description="任务执行的结果，通常是输出的文本或数据")
+
 # 定义添加命令的请求模型
 class AddCommandModel(BaseModel):
     task_id: Optional[str] = Field(None, description="任务的唯一标识符，如果未提供，则系统会生成新的 UUID")

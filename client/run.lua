@@ -24,18 +24,26 @@ local function pollServer()
             return
         end
 
-        logger.debug("Polling...")
+        logger.debug("Polling... Free Memory: ".. require("computer").freeMemory())
 
         -- 获取命令和 taskId
-        local taskId, command_table = executor.fetchCommands()
+        local taskId, command_table, isChunked = executor.fetchCommands()
+
+        if isChunked then
+            logger.debug("Using chunked upload")
+        end
 
         if taskId and command_table then
             -- 处理命令并获取结果
-            local command_result_table = executor.processCommands(command_table)
+            local command_result_table = executor.processCommands(command_table, isChunked)
 
             logger.debug("Reporting results for Task ID: " .. tostring(taskId))
             -- 将执行结果和 taskId 一起报告回服务器
-            executor.reportResults(taskId, command_result_table)
+            if isChunked then
+                executor.reportChunkedResults(taskId, command_result_table[1])
+            else
+                executor.reportResults(taskId, command_result_table)
+            end
         else
             logger.debug("No commands received or invalid response.")
         end

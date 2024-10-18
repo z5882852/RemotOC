@@ -11,8 +11,9 @@ local json = require("lib/json")
 
 local executor = {}
 
-local serverUrl = env.baseUrl .. "/api/cmd/get"    -- 获取命令的服务器接口
-local reportUrl = env.baseUrl .. "/api/cmd/report" -- 报告结果的服务器接口
+local serverUrl = env.baseUrl .. env.getPath
+local reportUrl = env.baseUrl .. env.reportPath
+local chunkedReportUrl = env.baseUrl .. env.chunkedReportPath
 
 
 
@@ -94,7 +95,7 @@ local function executeCommand(command_content)
 end
 
 -- 处理从服务器接收到的命令
-function executor.processCommands(command_table)
+function executor.processCommands(command_table, isChunked)
     logger.debug("Processing commands...") -- Debug: 输出接收到的命令表
     local command_result_table = {}
 
@@ -103,7 +104,11 @@ function executor.processCommands(command_table)
         local success, command_result = executeCommand(command_content)
 
         if success then
-            command_result_table[cid] = json.encode(command_result)
+            if isChunked and command_result.message == "success" then
+                command_result_table[cid] = command_result.data
+            else
+                command_result_table[cid] = json.encode(command_result)
+            end
         else
             command_result_table[cid] = json.encode({ message = command_result })
         end
@@ -120,7 +125,7 @@ function executor.fetchCommands()
     local response = ""
     if not req then
         logger.error("Unable to connect to the server.")
-        return nil, nil
+        return nil, nil, nil
     end
 
     -- 等待请求完成连接，设置超时时间
@@ -131,7 +136,7 @@ function executor.fetchCommands()
         if computer.uptime() - startTime > timeout then
             logger.error("Timeout while fetching commands to the server.")
             close(req)
-            return nil, nil
+            return nil, nil, nil
         end
         os.sleep(0)
     end
@@ -148,7 +153,7 @@ function executor.fetchCommands()
     close(req)
 
     if response == "" then
-        return nil, nil
+        return nil, nil, nil
     end
 
     -- 将 JSON 响应解码为 Lua 表
@@ -162,21 +167,21 @@ function executor.fetchCommands()
         else
             logger.warn("Unable to fetching commands: unknown error")
         end
-        return nil, nil
+        return nil, nil, nil
     end
 
     local command_table = res.data
 
     -- 检查是否包含 taskId 和 commands 字段
     if not command_table or not command_table.taskId or not command_table.commands then
-        return nil, nil
+        return nil, nil, nil
     end
 
 
     logger.debug("Task ID: " .. tostring(command_table.taskId))
 
     -- 返回 taskId 和 commands
-    return command_table.taskId, command_table.commands
+    return command_table.taskId, command_table.commands, command_table.is_chunked
 end
 
 -- 向服务器报告命令执行结果的函数
@@ -202,7 +207,7 @@ function executor.reportResults(taskId, command_result_table)
     end
 
     local startTime = computer.uptime()
-    local timeout = 2 -- 超时时间（秒）
+    local timeout = 4 -- 超时时间（秒）
 
     while not req.finishConnect() do
         if computer.uptime() - startTime > timeout then
@@ -220,6 +225,77 @@ function executor.reportResults(taskId, command_result_table)
 
     logger.debug("Results for Task ID " .. tostring(taskId) .. " successfully reported.")
     close(req)
+end
+
+-- 向服务器报告命令执行结果的函数（分块上传）
+function executor.reportChunkedResults(taskId, command_result_table)
+    logger.debug("Reporting command results to server for Task ID: " .. tostring(taskId) .. " using chunked upload.")
+
+    -- 设置默认的分块大小，如果没有传入则默认分块大小为 128
+    local chunk_size = env.chunkSize or 128
+    local total_commands = #command_result_table
+    local chunked = 1 -- 初始块编号为1，表示开始分块上传
+
+    -- 分块上传时，遍历所有结果，并分块发送
+    for i = 1, total_commands, chunk_size do
+        local chunked_result = {}
+
+        -- 获取当前块的结果
+        for j = i, math.min(i + chunk_size - 1, total_commands) do
+            chunked_result[#chunked_result + 1] = command_result_table[j]
+        end
+        chunked = i
+        -- 判断是否是最后一块
+        if i + chunk_size - 1 >= total_commands then
+            chunked = 0 -- 最后一块时，chunked 为 0
+        end
+
+        -- 准备报告数据
+        local report_data = {
+            task_id = taskId,
+            results = chunked_result
+        }
+
+        local headers = getHeaders()
+
+        -- 向服务器发送分块报告
+        local req = internet.request(
+            chunkedReportUrl .. "?chunked=" .. tostring(chunked),
+            json.encode(report_data),
+            headers
+        )
+
+        if not req then
+            logger.error("Unable to connect to the server to report chunked results.")
+            return
+        end
+
+        local startTime = computer.uptime()
+        local timeout = 4 -- 超时时间（秒）
+
+        while not req.finishConnect() do
+            if computer.uptime() - startTime > timeout then
+                logger.error("Timeout while reporting chunked results to the server.")
+                close(req)
+                return
+            end
+            os.sleep(0)
+        end
+
+        -- 读取并忽略响应内容（如果有）
+        repeat
+            local chunk = req.read()
+        until not chunk
+
+        logger.debug("Chunked results for Task ID " .. tostring(taskId) .. " successfully reported.")
+        close(req)
+
+        -- 如果最后一块已完成，结束循环
+        if chunked == 0 then
+            break
+        end
+        os.sleep(0.2)
+    end
 end
 
 loadPlugins()

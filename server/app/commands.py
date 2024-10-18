@@ -34,7 +34,7 @@ async def get_commands(x_client_id: Optional[str] = Header(None, description="�
     if task_id:
         task = task_manager.get_task(task_id)
         commands = task.get("commands", [])
-        is_chunked = task.get("is_chunked", False)  # 获取是否分块的参数，默认为 False
+        is_chunked = task.get("chunked", False)  # 获取是否分块的参数，默认为 False
         task_manager.update_task(task_id, status=PENDING)  # 设置任务为PENDING状态
         return {"code": 200, "message": f"Commands for task fetched successfully", "data": {"taskId": task_id, "commands": commands, "is_chunked": is_chunked }}
     else:
@@ -50,7 +50,7 @@ async def receive_chunked_report(request: Request, chunked: int = Query(-1, desc
         body = await request.body()  # OC返回数据为GBK，直接使用pydantic解析会报400错误
         decoded_body = decode_request_body(body)
         json_data = json.loads(decoded_body)
-        command_result = CommandResultModel(**json_data)
+        command_result = CommandChunkedResultModel(**json_data)
     except json.JSONDecodeError as e:
         logger.error(f"JSON 解析失败: {str(e)}")
         raise HTTPException(status_code=400, detail="JSON 格式错误")
@@ -205,7 +205,7 @@ async def add_task_by_name(data: AddTaskByNameModel):
     commands = task_config_entry.get("commands", [])
     if len(commands) != 1:
         return {"code": 400, "message": f"Commands error for task name: {task_id}", "data": {"taskId": task_id}}
-    is_chunked = task_config_entry.get("is_chunked", False)
+    is_chunked = task_config_entry.get("chunked", False)
 
     if not commands:
         return {"code": 400, "message": f"No commands found for task name: {task_id}", "data": {"taskId": task_id}}

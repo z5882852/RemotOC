@@ -10,6 +10,18 @@ local env = {
 
     -- 服务端令牌，防止第三方上报垃圾数据或非法获取数据，需要与服务器端相同
     serverToken = "3d4ed77e60b1aac9c7e4ca7f3a5cb47b",
+
+    -- 分块上报时每块的大小
+    chunkSize = 128,
+
+    -- 获取命令的接口
+    getPath = "/api/cmd/get",
+
+    -- 上报接口
+    reportPath = "/api/cmd/report",
+
+    -- 分块上报接口
+    chunkedReportPath = "/api/cmd/chunked_report",
 }
 
 return env
