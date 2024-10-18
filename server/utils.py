@@ -24,7 +24,9 @@ logger = logging.getLogger("uvicorn.error")
 # 任务状态常量
 READY = 'ready'
 PENDING = 'pending'
+UPLOADING = 'uploading'
 COMPLETED = 'completed'
+
 
 class TaskManager:
     def __init__(self, file_dir="tasks"):
@@ -36,18 +38,20 @@ class TaskManager:
         if not os.path.exists(self.file_dir):
             os.makedirs(self.file_dir)
 
-    def add_task(self, task_id: str, client_id: str, commands: list, status=READY) -> None:
+    def add_task(self, task_id: str, client_id: str, commands: list, status=READY, is_chunked=False) -> None:
         """
         添加任务
         :param task_id: 任务ID
         :param client_id: 客户ID
         :param commands: 命令列表
         :param status: 任务状态，默认状态为READY
+        :param is_chunked: 是否为分块上传的任务
         """
         task_data = {
             'client_id': client_id,
             'commands': commands,
             'status': status,
+            'is_chunked': is_chunked,  # 标识是否为分块任务
             'created_time': datetime.now().isoformat(),  # 任务创建时间
             'pending_time': None,  # Pending状态的时间
             'completed_time': None  # 任务结束时间

@@ -34,10 +34,83 @@ async def get_commands(x_client_id: Optional[str] = Header(None, description="�
     if task_id:
         task = task_manager.get_task(task_id)
         commands = task.get("commands", [])
+        is_chunked = task.get("is_chunked", False)  # 获取是否分块的参数，默认为 False
         task_manager.update_task(task_id, status=PENDING)  # 设置任务为PENDING状态
-        return {"code": 200, "message": f"Commands for task {task_id} fetched successfully", "data": {"taskId": task_id, "commands": commands}}
+        return {"code": 200, "message": f"Commands for task fetched successfully", "data": {"taskId": task_id, "commands": commands, "is_chunked": is_chunked }}
     else:
         return {"code": 200, "message": "No ready commands available", "data": None}
+
+
+@router.post("/chunked_report", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
+async def receive_chunked_report(request: Request, chunked: int = Query(-1, description="是否为分块上传，1表示开始，0表示结束，>1 表示继续上传")):
+    """
+    接收客户端的任务执行后的结果, 仅用于分块上传
+    """
+    try:
+        body = await request.body()  # OC返回数据为GBK，直接使用pydantic解析会报400错误
+        decoded_body = decode_request_body(body)
+        json_data = json.loads(decoded_body)
+        command_result = CommandResultModel(**json_data)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON 解析失败: {str(e)}")
+        raise HTTPException(status_code=400, detail="JSON 格式错误")
+    except UnicodeDecodeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    task_id = command_result.task_id
+    results = command_result.results
+
+    if not task_manager.task_exists(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # 如果 chunked == 1，则开始接收分块任务，覆盖已有数据，并将状态设置为 UPLOADING
+    if chunked == 1:
+        task = task_manager.get_task(task_id)
+        if task:
+            logger.debug(f"Task {task_id} already exists, resetting task with new data.")
+        # 重置任务数据并设置状态为 UPLOADING
+        task_manager.update_task(task_id, status=UPLOADING, results=results)
+        return {"code": 200, "message": f"Chunked data for task received and reset successfully", "data": {"taskId": task_id}}
+
+    # 如果 chunked > 1，则继续接收分块数据，添加进已有的任务里
+    elif chunked > 1:
+        task = task_manager.get_task(task_id)
+        if task.get("status") != UPLOADING:
+            return {"code": 200, "message": f"Task status is not uploading", "data": {"taskId": task_id}}
+        if task and "results" in task:
+            existing_results = task.get("results", [])
+            if isinstance(existing_results, list) and isinstance(results, list):
+                existing_results.extend(results)  # 添加到已有的结果里
+            task_manager.update_task(task_id, status=UPLOADING, results=existing_results)
+            return {"code": 200, "message": f"Chunked data for task added successfully", "data": {"taskId": task_id}}
+        else:
+            return {"code": 400, "message": f"task results is none", "data": {"taskId": task_id}}
+
+    # 为0时，表示接收完成，合并数据并更新任务状态为 COMPLETED
+    elif chunked == 0:
+        task = task_manager.get_task(task_id)
+        if task and "results" in task:
+            existing_results = task.get("results", [])
+            if isinstance(existing_results, list) and isinstance(results, list):
+                existing_results.extend(results)  # 合并数据
+            task_manager.update_task(task_id, status=COMPLETED, results=existing_results)
+        else:
+            # 没有数据，直接保存结果并完成任务
+            task_manager.update_task(task_id, status=COMPLETED, results=results)
+
+        for config in [timer_task_config, task_config]:
+            if task_id in config:
+                handle = config.get(task_id, {}).get("handle")
+                if handle:
+                    results = handle(results)
+                callback = config.get(task_id, {}).get("callback")
+                if callback:
+                    callback(results)
+
+        return {"code": 200, "message": f"Task result received and completed", "data": {"taskId": task_id}}
+
+    else:
+        raise HTTPException(status_code=400, detail="Invalid value for chunked. Must be 0 or 1 or greater than 1")
 
 
 @router.post("/report", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
@@ -67,13 +140,12 @@ async def receive_report(request: Request):
             handle = config.get(task_id, {}).get("handle")
             if handle:
                 results = handle(results)
-
             callback = config.get(task_id, {}).get("callback")
             if callback:
                 callback(results)
 
     task_manager.update_task(task_id, status=COMPLETED, results=results)
-    return {"code": 200, "message": f"Task {task_id} result received", "data": {"taskId": task_id}}
+    return {"code": 200, "message": f"Task result received", "data": {"taskId": task_id}}
 
 
 @router.post("/add", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
@@ -128,19 +200,22 @@ async def add_task_by_name(data: AddTaskByNameModel):
     # 从 task_config 中查找相应的任务
     task_config_entry = task_config.get(task_id)
     if not task_config_entry:
-        return {"code": 404, "message": f"Task config not found for task name: {task_id}", "data": None}
+        return {"code": 404, "message": f"Task config not found for task name: {task_id}", "data": {"taskId": task_id}}
 
     commands = task_config_entry.get("commands", [])
+    if len(commands) != 1:
+        return {"code": 400, "message": f"Commands error for task name: {task_id}", "data": {"taskId": task_id}}
+    is_chunked = task_config_entry.get("is_chunked", False)
 
     if not commands:
-        return {"code": 400, "message": f"No commands found for task name: {task_id}", "data": None}
+        return {"code": 400, "message": f"No commands found for task name: {task_id}", "data": {"taskId": task_id}}
 
     # 将任务加入任务管理器
     if task_config_entry.get('cache', False):
         if not task_manager.update_task(task_id, status=READY):
             # 没有任务则创建新任务
-            task_manager.add_task(task_id, client_id, commands, READY)
+            task_manager.add_task(task_id, client_id, commands, READY, is_chunked=is_chunked)
     else:
-        task_manager.add_task(task_id, client_id, commands, READY)
+        task_manager.add_task(task_id, client_id, commands, READY, is_chunked=is_chunked)
 
-    return {"code": 200, "message": f"Task '{task_id}' added with {len(commands)} command(s)", "data": {"taskId": task_id}}
+    return {"code": 200, "message": f"Task added with {len(commands)} command(s)", "data": {"taskId": task_id}}

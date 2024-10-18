@@ -183,6 +183,7 @@ RemoteOC
 ### **任务状态**
 - **`READY`**: 任务已准备好，等待客户端获取。
 - **`PENDING`**: 任务正在进行中，客户端已获取该任务并执行相关命令。
+- **`COMPLETED`**: 任务正在进行中，客户端正在分块报告数据（仅分块上传存在该状态）。
 - **`COMPLETED`**: 任务已完成，结果已被上报。
 
 ### **任务生命周期记录**
@@ -192,6 +193,35 @@ RemoteOC
 - **`completed_time`**: 任务完成的时间。
 
 这些时间信息会在任务的相关 API 中返回，帮助跟踪任务的整个生命周期。
+
+
+### 任务配置 (`task_config`)
+
+任务配置是一个字典结构，用于定义不同任务的执行方式、命令列表和相关回调处理逻辑。以下是 `task_config` 的基本结构：
+
+```python
+task_config = {
+    "task_id": {  # 键名为任务名，用于发起任务
+        'client_id': 'client_01',  # 指定执行命令的客户端ID
+        'commands': [  # 远程执行的命令列表
+            "your_command",
+        ],
+        'cache': False,  # 是否缓存数据，如果为True，则任务执行后不会清空上次执行的数据
+        'handle': None,  # 命令执行后的处理函数，格式为 handle(results: list)，用于处理执行结果
+        'callback': None,  # 命令执行后的回调函数，格式为 callback(results: list)，可选
+        'chunked': False  # 是否启用分块上传，True 表示启用，False 表示不启用（启用后commands只能为有1条命令，且上报数据是一个列表，后端将会把上报的列表合并）
+    },
+}
+```
+
+- **`client_id`**：用于指定任务发往的客户端ID。
+- **`commands`**：一个字符串列表，包含远程执行的命令。
+- **`cache`**：如果设为 `True`，则任务完成后不会清空上次的执行结果，可以缓存数据。
+- **`handle`**：一个可选的函数，用于上报过程中处理任务结果。
+- **`callback`**：一个可选的回调函数，当任务完成时调用。
+- **`chunked`**：指定任务是否启用分块上传。
+
+> 注：当启用chunked时commands列表只能有一条命令，并且放所有分块上报完成后才会执行handle和callback。
 
 ### **日志管理**
 日志级别由环境变量 `LOG_LEVEL` 控制，可选值为 `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`。
