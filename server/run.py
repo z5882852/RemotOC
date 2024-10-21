@@ -2,7 +2,8 @@ import uvicorn
 import argparse
 from app import app
 from scheduler import start_scheduler, stop_scheduler
-from utils import LOG_LEVEL
+from utils import LOG_LEVEL, task_manager, COMPLETED, logger
+from config import task_config
 
 
 def parse_args():
@@ -12,6 +13,20 @@ def parse_args():
     
     # 解析参数
     return parser.parse_args()
+
+
+def init_task_manager():
+    """初始化任务"""
+    for task_id, task_cfg in task_config.items():
+        if not task_manager.task_exists(task_id):
+            task_manager.add_task(
+                task_id, 
+                client_id=task_cfg.get("client_id", None), 
+                commands=task_cfg.get("commands", []), 
+                status=COMPLETED, 
+                is_chunked=task_cfg.get("chunked", False)
+            )
+    logger.debug("task init success.")
 
 
 if __name__ == "__main__":
@@ -24,6 +39,8 @@ if __name__ == "__main__":
 
     # 启动调度器
     start_scheduler()
+    # 初始化任务
+    init_task_manager()
     
     try:
         # 使用解析后的 host 和 port 启动 Uvicorn

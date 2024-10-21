@@ -163,7 +163,7 @@ async def add_command(data: AddCommandModel):
 
 
 @router.get("/status", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
-async def get_task_status(task_id: str = Query(..., description="任务id")):
+async def get_task_status(task_id: str = Query(..., description="任务id"), remove: bool = Query(True, description="如果任务为完成状态是否删除")):
     """
     获取指定task_id的任务状态
     """
@@ -172,7 +172,7 @@ async def get_task_status(task_id: str = Query(..., description="任务id")):
         return {"code": 404, "message": "Task not found", "data": None}
 
     status = task.get("status")
-    if status == COMPLETED:
+    if status == COMPLETED and remove:
         if task_id not in timer_task_config and task_id not in task_config:
             task_manager.remove_task(task_id)
     return {

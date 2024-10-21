@@ -287,7 +287,7 @@ function executor.reportChunkedResults(taskId, command_result_table)
             local chunk = req.read()
         until not chunk
 
-        logger.debug("Chunked results for Task ID " .. tostring(taskId) .. " successfully reported.")
+        logger.debug("Chunked results for Task ID " .. tostring(taskId) .. " successfully reported: " .. tostring(chunked))
         close(req)
 
         -- 如果最后一块已完成，结束循环
@@ -296,6 +296,7 @@ function executor.reportChunkedResults(taskId, command_result_table)
         end
         os.sleep(0.2)
     end
+    logger.debug("Report done.")
 end
 
 loadPlugins()
