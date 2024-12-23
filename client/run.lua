@@ -2,7 +2,7 @@ local event = require("event")
 
 local executor = require("src.executor")
 local env = require("env")
-local logger = require("lib/logger")
+local logger = require("lib.logger")
 
 local timerId  -- 存储计时器的 ID
 local shouldExit = false  -- 退出标志

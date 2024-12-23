@@ -5,8 +5,8 @@ local filesystem = require("filesystem")
 local shell = require("shell")
 
 local env = require("env")
-local logger = require("lib/logger")
-local json = require("lib/json")
+local logger = require("lib.logger")
+local json = require("lib.json")
 
 
 local executor = {}
@@ -19,6 +19,7 @@ local chunkedReportUrl = env.baseUrl .. env.chunkedReportPath
 
 -- 导入插件
 local function loadPlugins()
+    package.path = package.path .. ";" .. shell.resolve("lib/") .. "/?.lua"
     -- 获取当前工作目录的路径
     local pluginPath = shell.resolve("plugins/")
     for file in filesystem.list(pluginPath) do
